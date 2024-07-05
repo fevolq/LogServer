@@ -20,7 +20,7 @@ class LogDoc(BaseModel):
 
 @router.post('/submit')
 async def submit(req: LogDoc):
-    log_sls.info('log', '接收参数', project=req.project)
+    log_sls.info(prefix, 'submit 接收参数', project=req.project)
     assert req.project, '无效 project'
     assert req.doc, '无效 doc'
 

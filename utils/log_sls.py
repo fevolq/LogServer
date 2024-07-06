@@ -14,8 +14,6 @@ import os
 import time
 from typing import Union
 
-import requests
-
 from utils import util, colors, thread_func
 
 log_level = {
@@ -67,15 +65,17 @@ class LogSLS:
             'level': level,  # 日志等级
             'metadata': metadata,  # 元数据
             'module': __module__,  # 来源模块
-            'content': log_content,  # 日志内容
+            'doc': log_content,  # 日志内容
         }
         self.__save(doc)  # 日志存储
 
-    def __save(self, doc: dict):
+    @classmethod
+    def __save(cls, doc: dict):
         def request():
             # 若在当前服务使用request请求进行存储，由于路由中会调用sls，故会造成无限递归
             if LOG_SERVER:
-                requests.post(f'{LOG_SERVER}/log/submit', json={'project': LogSLS.__project, 'doc': doc})
+                import requests
+                requests.post(f'{LOG_SERVER}/log/submit', json={'project': cls.__project, 'doc': doc})
             else:
                 from dao import mongoDB
                 mongoDB.execute(LogSLS.__project, 'insert_one', doc)

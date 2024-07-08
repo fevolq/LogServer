@@ -3,7 +3,7 @@ version: '3.9'
 services:
   app:
     build: .
-    image: logsls:1.0.0
+    image: infq/logsls:1.1.0
     ports:
       - "${EXPOSE_PORT:-8000}:${PORT:-8000}"
     environment:
@@ -28,8 +28,8 @@ services:
   # 使用外部mongo时，可删除下面的配置
   mongo:
     image: mongo:5.0.14
-    ports:
-      - "${MONGO_EXPOSE_PORT:-27017}:27017"
+    # ports:
+    #   - "${MONGO_EXPOSE_PORT:-27017}:27017"
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER:-root}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PWD:-root}

@@ -1,5 +1,5 @@
 #!-*- coding:utf-8 -*-
-# FileName: 异步线程
+# FileName: 异步线程任务（非阻塞，并且不会阻塞主程序的退出）
 
 import logging
 import threading

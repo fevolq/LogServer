@@ -13,24 +13,25 @@ class ThreadPool:
     """
 
     __lock = threading.RLock()
+    _instance = None
     __pools = 100
 
     def __new__(cls, *args, **kwargs):
         # 构造单例
-        if hasattr(cls, 'instance'):
-            return cls.instance
+        if cls._instance is not None:
+            return cls._instance
 
         # 线程锁
         with cls.__lock:
-            if not hasattr(cls, 'instance'):
-                cls.instance = super(ThreadPool, cls).__new__(cls)
-            return cls.instance
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+            return cls._instance
 
     def __init__(self):
-        self.executor = ThreadPoolExecutor(ThreadPool.__pools)
+        self._executor = ThreadPoolExecutor(ThreadPool.__pools)
 
     def submit(self, func, *args, **kwargs):
-        self.executor.submit(func, *args, **kwargs)
+        self._executor.submit(func, *args, **kwargs)
         # try:
         #     self.executor.submit(func, *args, **kwargs)
         # except:
@@ -43,26 +44,27 @@ class ThreadQueue(threading.Thread):
     """
 
     __lock = threading.RLock()
-    queue = Queue()
+    _instance = None
     is_start_thread = False
 
     def __new__(cls, *args, **kwargs):
         # 构造单例
-        if hasattr(cls, 'instance'):
-            return cls.instance
+        if cls._instance is not None:
+            return cls._instance
 
         # 线程锁
         with cls.__lock:
-            if not hasattr(cls, 'instance'):
-                cls.instance = super(ThreadQueue, cls).__new__(cls)
-            return cls.instance
+            if cls._instance is None:
+                cls._instance = super().__new__(cls)
+            return cls._instance
 
     def __init__(self):
         threading.Thread.__init__(self)
+        self._queue = Queue()
 
     def run(self):
         while True:
-            data = ThreadQueue.queue.get()
+            data = self._queue.get()
             func = data['func']
             args = data['args']
             kwargs = data['kwargs']
@@ -76,7 +78,7 @@ class ThreadQueue(threading.Thread):
             'kwargs': kwargs,
         }
         try:
-            ThreadQueue.queue.put(data)
+            self._queue.put(data)
         except Exception as e:
             logging.exception(e)
 
@@ -97,6 +99,14 @@ def get_queue_instance():
 
 
 def submit(func, *args, use_pool: bool = True, **kwargs):
+    """
+    提交任务
+    :param func:
+    :param args:
+    :param use_pool: 是否在线程池使用
+    :param kwargs:
+    :return:
+    """
     if use_pool:
         instance = get_pool_instance()
     else:

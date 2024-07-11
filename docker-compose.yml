@@ -3,7 +3,7 @@ version: '3.9'
 services:
   app:
     build: .
-    image: infq/logsls:1.2.0
+    image: infq/logsls:1.3.0
     ports:
       - "${EXPOSE_PORT:-8000}:${PORT:-8000}"
     environment:

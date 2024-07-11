@@ -8,13 +8,13 @@ log结构化。
 2. 若需要存储，改变 LOG_SERVER 为实际的log服务地址；不存储，则注释LogSLS.__save中的调用
 3. 不包含logging初始化，若需要可参考__main__中的定义
 """
-
+import json
 import logging
 import os
 import time
 from typing import Union
 
-from utils import util, colors, thread_func
+from utils import util, colors, thread_func, DataEncoder
 
 log_level = {
     'debug': {'level': logging.DEBUG},
@@ -72,13 +72,17 @@ class LogSLS:
     @classmethod
     def __save(cls, doc: dict):
         def request():
+            json_data = json.dumps({'project': cls.__project, 'doc': doc}, cls=DataEncoder.ObjEncoder,
+                                   ensure_ascii=False)
+            data = json.loads(json_data)
+
             # 若在当前服务使用request请求进行存储，由于路由中会调用sls，故会造成无限递归
             if LOG_SERVER:
                 import requests
-                requests.post(f'{LOG_SERVER}/log/submit', json={'project': cls.__project, 'doc': doc})
+                requests.post(f'{LOG_SERVER}/log/submit', json=data)
             else:
                 from dao import mongoDB
-                mongoDB.execute(LogSLS.__project, 'insert_one', doc)
+                mongoDB.execute(LogSLS.__project, 'insert_one', data)
 
         thread_func.submit(request, use_pool=False)
         ...

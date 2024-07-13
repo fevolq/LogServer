@@ -71,18 +71,17 @@ class LogSLS:
 
     @classmethod
     def __save(cls, doc: dict):
-        def request():
-            json_data = json.dumps({'project': cls.__project, 'doc': doc}, cls=DataEncoder.ObjEncoder,
-                                   ensure_ascii=False)
-            data = json.loads(json_data)
+        json_data = json.dumps(doc, cls=DataEncoder.ObjEncoder, ensure_ascii=False)
+        doc = json.loads(json_data)
 
+        def request():
             # 若在当前服务使用request请求进行存储，由于路由中会调用sls，故会造成无限递归
             if LOG_SERVER:
                 import requests
-                requests.post(f'{LOG_SERVER}/log/submit', json=data)
+                requests.post(f'{LOG_SERVER}/log/submit', json={'project': cls.__project, 'doc': doc})
             else:
                 from dao import mongoDB
-                mongoDB.execute(LogSLS.__project, 'insert_one', data)
+                mongoDB.execute(LogSLS.__project, 'insert_one', doc)
 
         thread_func.submit(request, use_pool=False)
         ...

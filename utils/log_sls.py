@@ -11,6 +11,7 @@ log结构化。
 import json
 import logging
 import os
+import threading
 import time
 from typing import Union
 
@@ -27,11 +28,14 @@ LOG_SERVER = ''
 
 class LogSLS:
     __project = 'LogServer'  # 当前项目。每个项目应该唯一，数据会存储至对应的集合中。
+    __lock = threading.Lock()
     _instance = None
 
     def __new__(cls):
-        if not cls._instance:
-            cls._instance = super().__new__(cls)
+        if cls._instance is None:
+            with cls.__lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
         return cls._instance
 
     def __repr__(self):

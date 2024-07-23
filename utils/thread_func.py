@@ -16,6 +16,7 @@ class ThreadPool:
 
     __lock = threading.RLock()
     __instance = None
+    __has_init = False
     __pools = 100
 
     def __new__(cls, *args, **kwargs):
@@ -27,6 +28,9 @@ class ThreadPool:
         return cls.__instance
 
     def __init__(self):
+        if ThreadPool.__has_init:
+            return
+        ThreadPool.__has_init = True
         self._executor = ThreadPoolExecutor(ThreadPool.__pools)
 
     def submit(self, func, *args, **kwargs):
@@ -51,6 +55,7 @@ class ThreadQueue(threading.Thread):
 
     __lock = threading.RLock()
     __instance = None
+    __has_init = False
     _queue = Queue(maxsize=100)
 
     class StopFlag:
@@ -65,8 +70,11 @@ class ThreadQueue(threading.Thread):
         return cls.__instance
 
     def __init__(self):
+        if ThreadQueue.__has_init:
+            return
+        ThreadPool.__has_init = True
         super().__init__(name='ThreadQueue')
-        self._stop_flag = self.StopFlag()   # 结束标志
+        self._stop_flag = self.StopFlag()  # 结束标志
         self.daemon = True
         self.start()
 

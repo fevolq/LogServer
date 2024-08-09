@@ -30,6 +30,7 @@ class LogSLS:
     __project = 'LogServer'  # 当前项目。每个项目应该唯一，数据会存储至对应的集合中。
     __lock = threading.Lock()
     _instance = None
+    _save_instance: thread_func.ThreadQueue = thread_func.ThreadQueue('log_sls')
 
     def __new__(cls):
         if cls._instance is None:
@@ -87,7 +88,7 @@ class LogSLS:
                 from dao import mongoDB
                 mongoDB.execute(LogSLS.__project, 'insert_one', doc)
 
-        thread_func.submit(request, use_pool=False)
+        thread_func.submit(cls._save_instance, request)
         ...
 
     @staticmethod

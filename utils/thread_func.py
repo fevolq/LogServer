@@ -1,105 +1,117 @@
 #!-*- coding:utf-8 -*-
-# FileName: 异步线程
+# FileName: 异步线程任务
 
 import logging
+import queue
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from queue import Queue
+import atexit
+from typing import Union
 
 
 class ThreadPool:
     """
-    线程池。池中每增加一个任务，即增加一个线程，各自执行任务。
+    线程池。任务交给池中的线程执行
     """
 
-    __lock = threading.RLock()
-    __pools = 100
+    _instances = []
 
-    def __new__(cls, *args, **kwargs):
-        # 构造单例
-        if hasattr(cls, 'instance'):
-            return cls.instance
+    def __init__(self, name='default', *, maxsize: int = 0):
+        ThreadPool._instances.append(self)
+        self.name = name
+        maxsize = max(maxsize, 0) or None
+        self._executor = ThreadPoolExecutor(maxsize)
 
-        # 线程锁
-        with cls.__lock:
-            if not hasattr(cls, 'instance'):
-                cls.instance = super(ThreadPool, cls).__new__(cls)
-            return cls.instance
+    def submit(self, callback, *args, **kwargs):
+        try:
+            self._executor.submit(callback, *args, **kwargs)
+        except RuntimeError as e:
+            logging.error(f'Error submit {self.name} task: {e}')
+            raise
 
-    def __init__(self):
-        self.executor = ThreadPoolExecutor(ThreadPool.__pools)
-
-    def submit(self, func, *args, **kwargs):
-        self.executor.submit(func, *args, **kwargs)
-        # try:
-        #     self.executor.submit(func, *args, **kwargs)
-        # except:
-        #     self.executor.shutdown(False)
+    def shutdown(self, wait=True):
+        try:
+            self._executor.shutdown(wait=wait)
+        except Exception as e:
+            logging.error(f'Error shutdown {self.name}: {e}')
+            raise
 
 
 class ThreadQueue(threading.Thread):
     """
     单线程。主线程外另起一个线程，任务放到该线程的Queue中，顺序执行。
+    注意：当某一个示例的队列满了后，若仍继续提交任务，则会阻塞主线程
     """
 
-    __lock = threading.RLock()
-    queue = Queue()
-    is_start_thread = False
+    _instances = []
 
-    def __new__(cls, *args, **kwargs):
-        # 构造单例
-        if hasattr(cls, 'instance'):
-            return cls.instance
+    class StopFlag:
+        def __init__(self): ...
 
-        # 线程锁
-        with cls.__lock:
-            if not hasattr(cls, 'instance'):
-                cls.instance = super(ThreadQueue, cls).__new__(cls)
-            return cls.instance
-
-    def __init__(self):
-        threading.Thread.__init__(self)
+    def __init__(self, name='default', *, maxsize: int = 0):
+        super().__init__(name=name)
+        ThreadQueue._instances.append(self)
+        maxsize = max(maxsize, 0)
+        self.name = name
+        self._queue = Queue(maxsize=maxsize)
+        self._stop_flag = self.StopFlag()  # 结束标志
+        self.daemon = True
+        self.start()
 
     def run(self):
         while True:
-            data = ThreadQueue.queue.get()
-            func = data['func']
-            args = data['args']
-            kwargs = data['kwargs']
-            func(*args, **kwargs)
-            del data
+            try:
+                data = self._queue.get(timeout=1)
+                if data is self._stop_flag:
+                    self._queue.task_done()
+                    break
+                callback = data['callback']
+                args = data['args']
+                kwargs = data['kwargs']
+                try:
+                    callback(*args, **kwargs)
+                except Exception as e:
+                    logging.error(f'Error {callback.__name__}: {e}')
+                finally:
+                    self._queue.task_done()
+            except queue.Empty:
+                continue
 
-    def submit(self, func, *args, **kwargs):
+    def submit(self, callback, *args, **kwargs):
         data = {
-            'func': func,
+            'callback': callback,
             'args': args,
             'kwargs': kwargs,
         }
         try:
-            ThreadQueue.queue.put(data)
+            self._queue.put(data)
         except Exception as e:
             logging.exception(e)
+            raise
+
+    def shutdown(self, wait=True):
+        if self.ident is not None:
+            self._queue.put(self._stop_flag)
+            if wait:
+                self._queue.join()
+                self.join()
 
 
-def get_pool_instance():
-    return ThreadPool()
+def submit(instance: Union[ThreadPool, ThreadQueue], callback, *args, **kwargs):
+    """
+    提交任务
+    :param instance:
+    :param callback:
+    :param args:
+    :param kwargs:
+    :return:
+    """
+    instance.submit(callback, *args, **kwargs)
 
 
-def get_queue_instance():
-    thread_queue = ThreadQueue()
-    if not thread_queue.is_start_thread:
-        with threading.RLock():
-            if not thread_queue.is_start_thread:
-                thread_queue.is_start_thread = True
-                thread_queue.setDaemon(True)
-                thread_queue.start()
-    return thread_queue
-
-
-def submit(func, *args, use_pool: bool = True, **kwargs):
-    if use_pool:
-        instance = get_pool_instance()
-    else:
-        instance = get_queue_instance()
-
-    instance.submit(func, *args, **kwargs)
+@atexit.register
+def shutdown():
+    instances = [*ThreadPool._instances, *ThreadQueue._instances]
+    for instance in instances:
+        instance.shutdown(wait=True)
